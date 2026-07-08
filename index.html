@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>大學報版面字數統計</title>
+<title>大學報版面字數統計小工具</title>
 <style>
   :root{
     --panel-w: 268px;
@@ -143,9 +143,9 @@
 
   <aside id="panel">
     <div class="panel-inner">
-      <p class="tagline">在左側格線上拖曳出方框計算字數，或用下方按鈕產生區塊擺放版位。</p>
+      <p class="tagline">在左側格線上拖曳出方框計算字數（框線若壓在格子上，該格也會被計算）。或用下方按鈕產生區塊擺放版位。</p>
 
-      <div class="group-title">預設標題參考</div>
+      <div class="group-title">預設標題字數參考</div>
       <div class="preset-grid" id="presetGrid"></div>
 
       <div class="group-title">圖片</div>
@@ -157,13 +157,13 @@
         <span class="zoom-val" id="zoomVal">100%</span>
         <button data-zoom="in" title="放大">＋</button>
       </div>
-      <button class="action-btn" id="fitBtn">縮到整頁</button>
+      <button class="action-btn" id="fitBtn">縮小到整頁</button>
       <button class="action-btn primary" id="exportBtn">下載 JPG 圖檔</button>
       <button class="action-btn danger" id="clearBtn">全部清除</button>
 
       <div class="group-title">操作說明</div>
       <div class="hint">
-        <b>文字框：</b>在空白處拖曳即可畫出文字框，畫完可拉四角改大小，並可群組合併計算空格數。雙擊文字框標籤文字可修改。<br>
+        <b>文字框：</b>在空白處拖曳即可畫出文字框，畫完改大小，並可群組合併計算空格數。雙擊文字框標籤可修改文字。<br>
         <b>選取：</b>點框選取，<kbd>Shift</kbd>＋點按可多選。<br>
         <b>複製：</b><kbd>Ctrl</kbd> 或 <kbd>Alt</kbd> 拖曳可複製一份。<br>
         <b>刪除：</b>選取後按 <kbd>Delete</kbd> / <kbd>Backspace</kbd>。<br>
@@ -171,9 +171,7 @@
         <b>剪貼：</b><kbd>Ctrl</kbd>＋<kbd>C</kbd>/<kbd>X</kbd>/<kbd>V</kbd>。<br>
         <b>復原：</b><kbd>Ctrl</kbd>＋<kbd>Z</kbd>、重做 <kbd>Ctrl</kbd>＋<kbd>Shift</kbd>＋<kbd>Z</kbd>。<br>
         <b>縮放：</b><kbd>Ctrl</kbd>＋滾輪，或用「＋／－」「縮到整頁」。<br>
-        <b>預設標題：</b>點按鈕在中央產生深灰標題框，可選取、移動、刪除；大小固定不可調。<br>
-        <b>標題列：</b>右上「編輯：／日期：」欄位可直接點按輸入姓名與日期。<br>
-        <b>輸出：</b>「下載 JPG 圖檔」存出整頁；「全部清除」清空所有框。
+        <b>編輯與日期：</b>右上「編輯／日期」欄位可直接點按輸入文字，若文字太長，介面上可能會顯示不完整，但輸出成圖檔後會全見。<br>
       </div>
       <div class="status" id="statusBox">尚未選取任何方框。</div>
     </div>
@@ -475,7 +473,7 @@ function drawHeaderFooter(c, forExport){
   c.textAlign='center'; c.textBaseline='middle';
   c.font = `500 ${Math.min(FOOTER_H*0.42,14)}px "Noto Sans TC",sans-serif`;
   c.fillStyle="#9a9da3";
-  c.fillText('Designed by Roderick Chiu', worldW/2, worldH - FOOTER_H*0.5);
+  c.fillText('Designed by Roderick Chiu｜Built via vibe coding with Claude', worldW/2, worldH - FOOTER_H*0.5);
 }
 
 // 標題區的兩個真實輸入框（疊在 canvas 上，點擊一定有效）

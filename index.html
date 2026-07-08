@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大學報版面字數統計</title>
+<style>
+  :root{
+    --panel-w: 268px;
+    --ink:#2a2b2e;
+    --sub:#6a6d73;
+    --line:#e2e2e6;
+    --bg:#f3f4f6;
+    --accent:#2b6cff;
+    --panel-bg:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+    color:var(--ink);
+    background:var(--bg);
+    overflow:hidden;
+  }
+  #app{display:flex;height:100vh;width:100vw;}
+
+  /* ---------- 左側畫布區 ---------- */
+  #stage{
+    flex:1 1 auto;
+    position:relative;
+    overflow:auto;
+    background:var(--bg);
+  }
+  #canvasWrap{position:relative;width:max-content;}
+  canvas#main{display:block;background:transparent;image-rendering:auto;}
+  .hdr-field{
+    position:absolute; z-index:20;
+    border:none; border-bottom:1px solid #c9ccd2;
+    background:transparent; outline:none; padding:0 2px; margin:0;
+    color:#2a2b2e; font-family:inherit; box-sizing:border-box;
+    line-height:normal;
+  }
+  .hdr-field:focus{border-bottom-color:var(--accent);}
+  .hdr-field::placeholder{color:#b7bac0;}
+
+  #labelInput{
+    position:fixed;
+    z-index:50;
+    border:1px solid var(--accent);
+    border-radius:4px;
+    padding:1px 4px;
+    outline:none;
+    text-align:center;
+    background:#fff;
+    color:var(--ink);
+    transform:translate(-50%,-50%);
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
+    display:none;
+    font-family:inherit;
+  }
+
+  /* ---------- 右側工具面板 ---------- */
+  #panel{
+    width:var(--panel-w);
+    flex:0 0 var(--panel-w);
+    background:var(--panel-bg);
+    border-left:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+    overflow-y:auto;
+  }
+  .panel-inner{padding:18px 18px 26px;}
+  .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}
+  .brand h1{font-size:16px;font-weight:800;letter-spacing:.5px;margin:0;}
+  .brand span{font-size:11px;color:var(--sub);}
+  .tagline{font-size:11px;color:var(--sub);line-height:1.6;margin:2px 0 16px;}
+
+  .group-title{
+    font-size:11px;font-weight:700;color:var(--sub);
+    letter-spacing:1.5px;text-transform:none;
+    margin:18px 0 9px;display:flex;align-items:center;gap:8px;
+  }
+  .group-title::after{content:"";flex:1;height:1px;background:var(--line);}
+
+  .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  button{
+    font-family:inherit;cursor:pointer;border:none;border-radius:8px;
+    transition:transform .04s ease, background .15s ease, box-shadow .15s ease;
+  }
+  button:active{transform:translateY(1px);}
+  .preset-btn{
+    background:#4a4c52;color:#fff;font-size:12.5px;font-weight:600;
+    padding:9px 4px;line-height:1.3;
+  }
+  .preset-btn:hover{background:#33353b;}
+  .preset-btn.wide{grid-column:1 / -1;}
+
+  .action-btn{
+    width:100%;padding:11px;font-size:13px;font-weight:700;
+    background:#eef1f5;color:var(--ink);margin-top:9px;
+    border:1px solid var(--line);
+  }
+  .action-btn:hover{background:#e4e8ee;}
+  .action-btn.primary{background:#5a7794;color:#fff;border-color:transparent;}
+  .action-btn.primary:hover{background:#4c6883;}
+  .action-btn.danger{background:#7d2b3a;color:#fff;border-color:transparent;}
+  .action-btn.danger:hover{background:#6a2331;}
+
+  .zoombar{display:flex;align-items:center;gap:6px;margin-top:6px;}
+  .zoombar button{
+    flex:1;padding:7px;background:#eef1f5;border:1px solid var(--line);
+    font-size:14px;font-weight:700;color:var(--ink);
+  }
+  .zoombar button:hover{background:#e4e8ee;}
+  .zoom-val{flex:1.4;text-align:center;font-size:12px;color:var(--sub);
+    font-variant-numeric:tabular-nums;}
+
+  .hint{font-size:11px;color:var(--sub);line-height:1.75;margin-top:6px;}
+  .hint b{color:var(--ink);font-weight:700;}
+  kbd{
+    display:inline-block;background:#f1f2f5;border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:10.5px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;color:#4a4c52;
+    line-height:1.5;
+  }
+  .status{
+    font-size:11px;color:var(--sub);margin-top:10px;padding-top:10px;
+    border-top:1px dashed var(--line);line-height:1.7;
+  }
+  .status b{color:var(--accent);font-variant-numeric:tabular-nums;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <div id="canvasWrap">
+      <canvas id="main"></canvas>
+      <input id="hdrEditor" class="hdr-field" type="text" placeholder="點此輸入姓名" autocomplete="off" spellcheck="false">
+      <input id="hdrDate" class="hdr-field" type="text" placeholder="點此輸入日期" autocomplete="off" spellcheck="false">
+    </div>
+  </div>
+
+  <aside id="panel">
+    <div class="panel-inner">
+      <p class="tagline">在左側格線上拖曳出方框計算字數，或用下方按鈕產生區塊擺放版位。</p>
+
+      <div class="group-title">預設標題參考</div>
+      <div class="preset-grid" id="presetGrid"></div>
+
+      <div class="group-title">圖片</div>
+      <button class="preset-btn" id="imageBtn" title="空心打叉的圖片框" style="width:100%;">圖片框</button>
+
+      <div class="group-title">頁面工具</div>
+      <div class="zoombar">
+        <button data-zoom="out" title="縮小">－</button>
+        <span class="zoom-val" id="zoomVal">100%</span>
+        <button data-zoom="in" title="放大">＋</button>
+      </div>
+      <button class="action-btn" id="fitBtn">縮到整頁</button>
+      <button class="action-btn primary" id="exportBtn">下載 JPG 圖檔</button>
+      <button class="action-btn danger" id="clearBtn">全部清除</button>
+
+      <div class="group-title">操作說明</div>
+      <div class="hint">
+        <b>文字框：</b>在空白處拖曳即可畫出文字框，畫完可拉四角改大小，並可群組合併計算空格數。雙擊文字框標籤文字可修改。<br>
+        <b>選取：</b>點框選取，<kbd>Shift</kbd>＋點按可多選。<br>
+        <b>複製：</b><kbd>Ctrl</kbd> 或 <kbd>Alt</kbd> 拖曳可複製一份。<br>
+        <b>刪除：</b>選取後按 <kbd>Delete</kbd> / <kbd>Backspace</kbd>。<br>
+        <b>群組：</b><kbd>Ctrl</kbd>＋<kbd>G</kbd> 群組、<kbd>Ctrl</kbd>＋<kbd>Shift</kbd>＋<kbd>G</kbd> 取消（僅文字框可群組）。<br>
+        <b>剪貼：</b><kbd>Ctrl</kbd>＋<kbd>C</kbd>/<kbd>X</kbd>/<kbd>V</kbd>。<br>
+        <b>復原：</b><kbd>Ctrl</kbd>＋<kbd>Z</kbd>、重做 <kbd>Ctrl</kbd>＋<kbd>Shift</kbd>＋<kbd>Z</kbd>。<br>
+        <b>縮放：</b><kbd>Ctrl</kbd>＋滾輪，或用「＋／－」「縮到整頁」。<br>
+        <b>預設標題：</b>點按鈕在中央產生深灰標題框，可選取、移動、刪除；大小固定不可調。<br>
+        <b>標題列：</b>右上「編輯：／日期：」欄位可直接點按輸入姓名與日期。<br>
+        <b>輸出：</b>「下載 JPG 圖檔」存出整頁；「全部清除」清空所有框。
+      </div>
+      <div class="status" id="statusBox">尚未選取任何方框。</div>
+    </div>
+  </aside>
+</div>
+
+<input id="labelInput" type="text" autocomplete="off" spellcheck="false">
+
+<script>
+/* =========================================================
+   幾何常數（世界座標，單位：px）
+   小格子邊長 S=20；行間距=0.25S；欄間距=1.5S；欄寬=14 格
+   ========================================================= */
+const S = 20;
+const ROW_GAP = 0.25 * S;      // 行間距 5
+const COL_GAP = 1.5 * S;       // 欄間距 30
+const COL_W   = 14 * S;        // 每欄寬 280
+const PAD     = 3 * S;         // 上下左留白 60
+const N_COLS = 5, N_SQ = 14, N_ROWS = 73, DARK_ROWS = 6;
+
+const gridW = N_COLS*COL_W + (N_COLS-1)*COL_GAP;   // 1520
+const gridH = N_ROWS*S + (N_ROWS-1)*ROW_GAP;       // 1820
+const HEADER_H = 3*S;      // 頂部標題區（3 格高的空白）
+const FOOTER_H = 2*S;      // 底部署名區
+const originX = PAD, originY = HEADER_H + PAD;
+const worldW = PAD + gridW + PAD;                  // 左留白 + 格線 + 右緩衝
+const worldH = HEADER_H + PAD + gridH + PAD + FOOTER_H;
+
+const COL_LIGHT = "#e6e6e8";
+const COL_DARK  = "#b4b4b8";
+const COL_BORDER= "#ffffff";
+
+function sqX(c,i){ return originX + c*(COL_W+COL_GAP) + i*S; }
+function sqY(r){ return originY + r*(S+ROW_GAP); }
+
+/* 計算矩形壓到幾個小格子（含框線壓到的） */
+function countSquares(x,y,w,h){
+  const x2=x+w, y2=y+h, eps=0.0002*S;
+  let ny=0;
+  for(let r=0;r<N_ROWS;r++){ const t=sqY(r), b=t+S; if(t<y2-eps && b>y+eps) ny++; }
+  if(!ny) return 0;
+  let nx=0;
+  for(let c=0;c<N_COLS;c++) for(let i=0;i<N_SQ;i++){
+    const l=sqX(c,i), rr=l+S; if(l<x2-eps && rr>x+eps) nx++;
+  }
+  return nx*ny;
+}
+/* 群組：多個矩形覆蓋的「不重複」小格子總數 */
+function unionCount(members){
+  const covered = new Uint8Array(N_COLS*N_SQ*N_ROWS);
+  const eps=0.0002*S;
+  for(const m of members){
+    const x=m.x,y=m.y,x2=x+m.w,y2=y+m.h;
+    for(let r=0;r<N_ROWS;r++){
+      const t=sqY(r), b=t+S; if(!(t<y2-eps && b>y+eps)) continue;
+      for(let c=0;c<N_COLS;c++) for(let i=0;i<N_SQ;i++){
+        const l=sqX(c,i), rr=l+S;
+        if(l<x2-eps && rr>x+eps) covered[(r*N_COLS+c)*N_SQ+i]=1;
+      }
+    }
+  }
+  let n=0; for(let k=0;k<covered.length;k++) n+=covered[k]; return n;
+}
+
+/* =========================================================
+   狀態
+   ========================================================= */
+let rects = [];                 // 所有方框
+let groups = {};                // gid -> {label, color}
+let idc = 1, gidc = 1;
+const selection = new Set();    // 選取中的 rect id
+let header = {editor:'', date:''};   // 頂部可編輯：編輯者姓名 / 日期
+
+let scale = 1, minScale = .1, maxScale = 3;
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+const stage = document.getElementById('stage');
+const wrap  = document.getElementById('canvasWrap');
+const canvas= document.getElementById('main');
+const ctx   = canvas.getContext('2d');
+let gridCanvas = document.createElement('canvas');
+let gctx = gridCanvas.getContext('2d');
+
+/* =========================================================
+   預設標題參考
+   ========================================================= */
+const PRESETS = [
+  {key:'頭條單行', name:'頭條標題單行16字',   rows:6, cols:5},
+  {key:'二條單行', name:'二條標題單行16字',   rows:5, cols:4},
+  {key:'二條雙行', name:'二條雙行標題共24字', rows:9, cols:3},
+  {key:'三條單行', name:'三條標題單行15字',   rows:4, cols:3},
+  {key:'三條雙行', name:'三條標題雙行共20字', rows:7, cols:2},
+  {key:'四條單行', name:'四條標題單行15字',   rows:3, cols:2},
+  {key:'四條雙行', name:'四條雙行標題共14字', rows:5, cols:1},
+  {key:'自由標題框', name:'標題', rows:5, cols:4, resizable:true},
+];
+function presetSize(p){
+  const h = p.rows*S + (p.rows-1)*ROW_GAP;
+  const w = p.cols*COL_W + (p.cols-1)*COL_GAP;
+  return {w,h};
+}
+(function buildPresetButtons(){
+  const grid = document.getElementById('presetGrid');
+  PRESETS.forEach((p)=>{
+    const b = document.createElement('button');
+    b.className = 'preset-btn' + (p.wide ? ' wide':'');
+    b.textContent = p.key;
+    b.title = p.name;
+    b.onclick = ()=>addPreset(p);
+    grid.appendChild(b);
+  });
+})();
+
+/* =========================================================
+   顏色：每次隨機一個高彩度、高明度的顏色（全色相）
+   ========================================================= */
+function randomColor(){
+  const h = Math.floor(Math.random()*360);   // 全色相隨機
+  const s = 85 + Math.random()*12;           // 85–97% 高彩度
+  const l = 55 + Math.random()*10;           // 55–65% 高明度
+  return `hsl(${h} ${s.toFixed(0)}% ${l.toFixed(0)}%)`;
+}
+
+/* =========================================================
+   建立格線快取
+   ========================================================= */
+function buildGrid(){
+  const W = Math.max(1, Math.round(worldW*scale*dpr)), H = Math.max(1, Math.round(worldH*scale*dpr));
+  gridCanvas.width = W; gridCanvas.height = H;
+  gctx.setTransform(scale*dpr,0,0,scale*dpr,0,0);
+  gctx.clearRect(0,0,worldW,worldH);
+  gctx.fillStyle = "#ffffff";
+  gctx.fillRect(0,0,worldW,worldH);
+  gctx.lineWidth = 1;
+  gctx.strokeStyle = COL_BORDER;
+  for(let c=0;c<N_COLS;c++){
+    for(let i=0;i<N_SQ;i++){
+      for(let r=0;r<N_ROWS;r++){
+        const x=sqX(c,i), y=sqY(r);
+        gctx.fillStyle = (r<DARK_ROWS)? COL_DARK : COL_LIGHT;
+        gctx.fillRect(x,y,S,S);
+        gctx.strokeRect(x+0.5, y+0.5, S-1, S-1);
+      }
+    }
+  }
+}
+
+/* =========================================================
+   縮放 / 尺寸
+   ========================================================= */
+function stageW(){ return stage.clientWidth || (window.innerWidth - 268); }
+function stageH(){ return stage.clientHeight || window.innerHeight; }
+function fitWidthScale(){ return Math.max(0.02, stageW()/worldW); }
+function fitPageScale(){ return Math.max(0.02, Math.min(stageW()/worldW, stageH()/worldH)); }
+
+function applyScale(){
+  scale = Math.max(minScale, Math.min(maxScale, scale));
+  canvas.style.width  = (worldW*scale) + 'px';
+  canvas.style.height = (worldH*scale) + 'px';
+  canvas.width  = Math.max(1, Math.round(worldW*scale*dpr));
+  canvas.height = Math.max(1, Math.round(worldH*scale*dpr));
+  buildGrid();
+  document.getElementById('zoomVal').textContent = Math.round(scale/fitWidthScale()*100) + '%';
+  positionHeaderInputs();
+  render();
+}
+function recomputeBounds(){
+  minScale = fitPageScale()*0.98;
+  maxScale = fitWidthScale()*3;
+}
+
+/* =========================================================
+   繪製（統一以傳入的 context 繪製，畫面與匯出共用）
+   ========================================================= */
+// 數字/標籤字級：字級再放大一倍，並確保整體不超出框高
+function baseSizes(w,h,hasLabel){
+  let nf = Math.min(w*0.42, h*0.55, 46) * 2;          // 放大一倍
+  let lf = Math.max(11, Math.min(nf*0.5, 40));
+  const gap = nf*0.34;                                // 數字與標籤的間隔
+  const blockH = hasLabel ? nf + gap + lf : nf;
+  const sf = Math.min(1, (h*0.9)/blockH);             // 避免超出框高
+  return {nf:nf*sf, lf:lf*sf, gap:gap*sf};
+}
+
+function drawStacked(c, cx, cy, numStr, labelStr, nf, lf, gap, numColor, labelColor){
+  c.textAlign='center'; c.textBaseline='middle';
+  const hasLabel = labelStr && labelStr.length>0;
+  if(hasLabel){
+    const blockH = nf + gap + lf, top = cy - blockH/2;
+    c.font = `800 ${nf}px "Noto Sans TC",sans-serif`; c.fillStyle=numColor;
+    c.fillText(numStr, cx, top + nf/2);
+    c.font = `600 ${lf}px "Noto Sans TC",sans-serif`; c.fillStyle=labelColor;
+    c.fillText(labelStr, cx, top + nf + gap + lf/2);
+  } else {
+    c.font = `800 ${nf}px "Noto Sans TC",sans-serif`; c.fillStyle=numColor;
+    c.fillText(numStr, cx, cy);
+  }
+}
+
+function drawPresetOn(c, R){
+  c.fillStyle = "#4a4c52"; c.fillRect(R.x, R.y, R.w, R.h);
+  const fs = fitTextC(c, R.name, R.w*0.9, Math.min(R.h*0.32, 30));
+  c.font = `700 ${fs}px "Noto Sans TC",sans-serif`; c.fillStyle="#fff";
+  c.textAlign='center'; c.textBaseline='middle';
+  c.fillText(R.name, R.x+R.w/2, R.y+R.h/2);
+}
+
+function drawImageBoxOn(c, R){
+  // 空心、深灰粗框，中央打叉（對角線與框線同粗）
+  c.strokeStyle = "#4a4c52";
+  c.lineWidth = 4;
+  c.lineJoin = 'miter';
+  c.strokeRect(R.x, R.y, R.w, R.h);
+  c.beginPath();
+  c.moveTo(R.x, R.y);           c.lineTo(R.x+R.w, R.y+R.h);
+  c.moveTo(R.x+R.w, R.y);       c.lineTo(R.x, R.y+R.h);
+  c.stroke();
+}
+
+function drawRectOn(c, R){
+  if(R.kind==='preset'){ drawPresetOn(c, R); return; }
+  if(R.kind==='image'){ drawImageBoxOn(c, R); return; }
+  if(R.groupId){
+    c.lineWidth = 1.8;
+    c.strokeStyle = (groups[R.groupId]&&groups[R.groupId].color)||R.color||'#e879b9';
+    c.strokeRect(R.x, R.y, R.w, R.h); return;
+  }
+  c.lineWidth = 1.8; c.strokeStyle = R.color; c.strokeRect(R.x, R.y, R.w, R.h);
+  const cnt = String(countSquares(R.x,R.y,R.w,R.h));
+  const hasLabel = R.label && R.label.length>0;
+  let {nf,lf,gap} = baseSizes(R.w, R.h, hasLabel);
+  nf = fitTextC(c, cnt, R.w*0.9, nf);
+  if(hasLabel) lf = fitTextC(c, R.label, R.w*0.9, lf);
+  drawStacked(c, R.x+R.w/2, R.y+R.h/2, cnt, R.label, nf, lf, gap, "#33353b", "#7a7d84");
+}
+
+function groupBBox(members){
+  let x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;
+  for(const m of members){ x1=Math.min(x1,m.x); y1=Math.min(y1,m.y); x2=Math.max(x2,m.x+m.w); y2=Math.max(y2,m.y+m.h); }
+  return {x:x1,y:y1,w:x2-x1,h:y2-y1};
+}
+
+function drawGroupTextOn(c, gid){
+  const members = rects.filter(r=>r.groupId===gid);
+  if(!members.length) return;
+  const bb = groupBBox(members);
+  const cnt = String(unionCount(members));
+  const g = groups[gid];
+  const hasLabel = g.label && g.label.length>0;
+  let {nf,lf,gap} = baseSizes(bb.w, bb.h, hasLabel);
+  nf = fitTextC(c, cnt, bb.w*0.9, nf);
+  if(hasLabel) lf = fitTextC(c, g.label, bb.w*0.9, lf);
+  drawStacked(c, bb.x+bb.w/2, bb.y+bb.h/2, cnt, g.label, nf, lf, gap, "#2a2b2e", "#6a6d73");
+}
+
+/* 頂部標題列（左標題 + 右方可編輯的 編輯/日期）
+   欄位靠左固定、寬度固定，標籤不會因輸入內容而移動 */
+function computeHeaderZones(c){
+  const rightX = originX + gridW;
+  const hf = 17;
+  const fieldsX = rightX - 430;      // 欄位區固定左緣（夠寬）
+  const labelReserve = hf*3.4;       // 「編輯：」「日期：」標籤預留寬度（兩行對齊）
+  const mk = (label, value, yc)=>{
+    const left = fieldsX;
+    const fieldX = fieldsX + labelReserve;
+    return {label, value, yc, hf, left, fieldX, fieldRight:rightX, valW:rightX-fieldX};
+  };
+  return {
+    editor: mk('編輯：', header.editor, HEADER_H*0.30),
+    date:   mk('日期：', header.date,   HEADER_H*0.70),
+  };
+}
+
+function drawHeaderFooter(c, forExport){
+  // 左側標題
+  c.textAlign='left'; c.textBaseline='middle';
+  const tf = Math.min(HEADER_H*0.5, 27);
+  c.font = `800 ${tf}px "Noto Sans TC",sans-serif`; c.fillStyle="#2a2b2e";
+  c.fillText('大學報版面字數統計小工具', originX, HEADER_H*0.5);
+  // 右側 編輯／日期 標籤與底線（值由畫面上的輸入框顯示；匯出時才把值畫進圖）
+  const z = computeHeaderZones(c);
+  for(const key of ['editor','date']){
+    const f = z[key];
+    c.textAlign='left'; c.textBaseline='middle';
+    c.font = `600 ${f.hf}px "Noto Sans TC",sans-serif`; c.fillStyle="#4a4c52";
+    c.fillText(f.label, f.left, f.yc);
+    if(forExport){
+      c.strokeStyle="#c9ccd2"; c.lineWidth=1;
+      c.beginPath(); c.moveTo(f.fieldX, f.yc + f.hf*0.7); c.lineTo(f.fieldRight, f.yc + f.hf*0.7); c.stroke();
+      if(f.value){
+        const vs = fitTextC(c, f.value, f.valW-8, f.hf);   // 太長時縮小以塞入欄位
+        c.font = `600 ${vs}px "Noto Sans TC",sans-serif`;
+        c.fillStyle="#2a2b2e"; c.textAlign='left'; c.textBaseline='middle';
+        c.fillText(f.value, f.fieldX+4, f.yc);
+      }
+    }
+  }
+  // 底部署名（置中）
+  c.textAlign='center'; c.textBaseline='middle';
+  c.font = `500 ${Math.min(FOOTER_H*0.42,14)}px "Noto Sans TC",sans-serif`;
+  c.fillStyle="#9a9da3";
+  c.fillText('Designed by Roderick Chiu', worldW/2, worldH - FOOTER_H*0.5);
+}
+
+// 標題區的兩個真實輸入框（疊在 canvas 上，點擊一定有效）
+const hdrEditor = document.getElementById('hdrEditor');
+const hdrDate   = document.getElementById('hdrDate');
+function positionHeaderInputs(){
+  const z = computeHeaderZones(ctx);
+  const pairs = [['editor',hdrEditor], ['date',hdrDate]];
+  for(const [key, inp] of pairs){
+    const f = z[key];
+    const h = f.hf*1.5;
+    inp.style.left   = (f.fieldX*scale)+'px';
+    inp.style.top    = ((f.yc - h/2)*scale)+'px';
+    inp.style.width  = ((f.fieldRight - f.fieldX)*scale)+'px';
+    inp.style.height = (h*scale)+'px';
+    inp.style.fontSize = (f.hf*0.95*scale)+'px';
+  }
+}
+hdrEditor.addEventListener('input', ()=>{ header.editor = hdrEditor.value; });
+hdrDate.addEventListener('input',   ()=>{ header.date   = hdrDate.value; });
+
+// 內容層（標題/署名 + 方框 + 群組文字）— 畫面與匯出共用
+function drawContent(c, forExport){
+  drawHeaderFooter(c, forExport);
+  for(const R of rects) drawRectOn(c, R);
+  for(const gid in groups) drawGroupTextOn(c, gid);
+}
+
+function render(){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(gridCanvas.width>0 && gridCanvas.height>0) ctx.drawImage(gridCanvas,0,0);
+  ctx.setTransform(scale*dpr,0,0,scale*dpr,0,0);
+
+  drawContent(ctx);
+  drawSelection();
+
+  if(drawing){
+    const r = normRect(drawing);
+    ctx.setLineDash([6/scale,4/scale]);
+    ctx.lineWidth = 1.6; ctx.strokeStyle = drawing.color;
+    ctx.strokeRect(r.x,r.y,r.w,r.h);
+    ctx.setLineDash([]);
+    const cnt = String(countSquares(r.x,r.y,r.w,r.h));
+    const {nf} = baseSizes(r.w, r.h, false);
+    const nfit = fitTextC(ctx, cnt, r.w*0.9, nf);
+    ctx.font = `800 ${nfit}px "Noto Sans TC",sans-serif`;
+    ctx.fillStyle="#33353b"; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(cnt, r.x+r.w/2, r.y+r.h/2);
+  }
+}
+
+function drawSelection(){
+  const sel = [...selection].map(id=>rects.find(r=>r.id===id)).filter(Boolean);
+  if(!sel.length) return;
+  ctx.save();
+  ctx.strokeStyle = "#2b6cff";
+  ctx.setLineDash([4/scale,3/scale]);
+  ctx.lineWidth = 1.4;
+  for(const R of sel){
+    ctx.strokeRect(R.x-2/scale, R.y-2/scale, R.w+4/scale, R.h+4/scale);
+  }
+  ctx.setLineDash([]);
+  // 單一可調整大小的框 -> 顯示控制點
+  const one = singleResizable();
+  if(one){
+    const hs = 5/scale;
+    ctx.fillStyle="#fff"; ctx.strokeStyle="#2b6cff"; ctx.lineWidth=1.3;
+    for(const p of handlePoints(one)){
+      ctx.fillRect(p.x-hs, p.y-hs, hs*2, hs*2);
+      ctx.strokeRect(p.x-hs, p.y-hs, hs*2, hs*2);
+    }
+  }
+  ctx.restore();
+}
+
+function handlePoints(R){
+  const {x,y,w,h}=R;
+  return [
+    {n:'nw',x:x,     y:y},     {n:'n',x:x+w/2,y:y},     {n:'ne',x:x+w,y:y},
+    {n:'w', x:x,     y:y+h/2},                          {n:'e', x:x+w,y:y+h/2},
+    {n:'sw',x:x,     y:y+h},   {n:'s',x:x+w/2,y:y+h},   {n:'se',x:x+w,y:y+h},
+  ];
+}
+function singleResizable(){
+  if(selection.size!==1) return null;
+  const R = rects.find(r=>r.id===[...selection][0]);
+  if(R && !R.groupId && (R.kind==='draw' || R.resizable)) return R;
+  return null;
+}
+
+/* =========================================================
+   命中判定
+   ========================================================= */
+function rectAt(x,y){
+  for(let k=rects.length-1;k>=0;k--){
+    const R=rects[k];
+    if(x>=R.x && x<=R.x+R.w && y>=R.y && y<=R.y+R.h) return R;
+  }
+  return null;
+}
+function handleAt(x,y){
+  const R = singleResizable();
+  if(!R) return null;
+  const tol = 7/scale;
+  for(const p of handlePoints(R)){
+    if(Math.abs(x-p.x)<=tol && Math.abs(y-p.y)<=tol) return p.n;
+  }
+  return null;
+}
+
+/* =========================================================
+   選取工具
+   ========================================================= */
+function unitOf(R){ // 傳回與 R 同一操作單位的所有 id（群組則整組）
+  if(R.groupId) return rects.filter(r=>r.groupId===R.groupId).map(r=>r.id);
+  return [R.id];
+}
+function setSelection(ids){ selection.clear(); ids.forEach(i=>selection.add(i)); updateStatus(); }
+function addSelection(ids){ ids.forEach(i=>selection.add(i)); updateStatus(); }
+function toggleUnit(R){
+  const ids = unitOf(R);
+  const on = ids.every(i=>selection.has(i));
+  if(on) ids.forEach(i=>selection.delete(i)); else ids.forEach(i=>selection.add(i));
+  updateStatus();
+}
+
+/* =========================================================
+   互動狀態
+   ========================================================= */
+let drawing=null;        // {x0,y0,x,y,color}
+let moving=null;         // {startPts:Map(id->{x,y}), lastX,lastY, moved}
+let resizing=null;       // {id, handle, orig:{x,y,w,h}}
+let downX=0,downY=0;
+
+function evtWorld(e){
+  const r = canvas.getBoundingClientRect();
+  return { x:(e.clientX-r.left)/scale, y:(e.clientY-r.top)/scale };
+}
+function normRect(d){
+  const x=Math.min(d.x0,d.x), y=Math.min(d.y0,d.y);
+  return {x, y, w:Math.abs(d.x-d.x0), h:Math.abs(d.y-d.y0)};
+}
+
+canvas.addEventListener('mousedown', e=>{
+  if(e.button!==0) return;
+  commitLabel();
+  const p = evtWorld(e);
+  downX=e.clientX; downY=e.clientY;
+
+  // 1) 控制點 -> 調整大小
+  const hn = handleAt(p.x,p.y);
+  if(hn){
+    const R = singleResizable();
+    resizing = {id:R.id, handle:hn, orig:{x:R.x,y:R.y,w:R.w,h:R.h}};
+    return;
+  }
+  // 2) 點到方框
+  const R = rectAt(p.x,p.y);
+  if(R){
+    if(e.shiftKey){ toggleUnit(R); render(); return; }
+    const ids = unitOf(R);
+    const already = ids.every(i=>selection.has(i));
+    if(!already) setSelection(ids);
+    // Ctrl / Alt 拖曳 -> 複製
+    if((e.ctrlKey||e.metaKey||e.altKey)){
+      pushHistory();
+      const newIds = cloneSelection();
+      setSelection(newIds);
+    }
+    // 開始移動
+    const startPts = new Map();
+    for(const id of selection){ const r=rects.find(x=>x.id===id); startPts.set(id,{x:r.x,y:r.y}); }
+    moving = {startPts, lastX:p.x, lastY:p.y, moved:false, copied:(e.ctrlKey||e.metaKey||e.altKey)};
+    render();
+    return;
+  }
+  // 3) 空白 -> 畫新框
+  setSelection([]);
+  drawing = {x0:p.x, y0:p.y, x:p.x, y:p.y, color:randomColor()};
+  render();
+});
+
+window.addEventListener('mousemove', e=>{
+  if(!drawing && !moving && !resizing){
+    // hover 游標
+    const p = evtWorld(e);
+    if(handleAt(p.x,p.y)) canvas.style.cursor='nwse-resize';
+    else if(rectAt(p.x,p.y)) canvas.style.cursor='move';
+    else canvas.style.cursor='crosshair';
+    return;
+  }
+  const p = evtWorld(e);
+  if(drawing){ drawing.x=p.x; drawing.y=p.y; render(); }
+  else if(moving){
+    const dx=p.x-moving.lastX, dy=p.y-moving.lastY;
+    moving.lastX=p.x; moving.lastY=p.y;
+    if(Math.abs(e.clientX-downX)>3||Math.abs(e.clientY-downY)>3) moving.moved=true;
+    for(const id of selection){ const r=rects.find(x=>x.id===id); r.x+=dx; r.y+=dy; }
+    render();
+  }
+  else if(resizing){
+    applyResize(evtWorld(e));
+    render();
+  }
+});
+
+window.addEventListener('mouseup', e=>{
+  if(drawing){
+    const r = normRect(drawing);
+    if(r.w>6 && r.h>6){
+      pushHistory();
+      const R = {id:idc++, kind:'draw', x:r.x,y:r.y,w:r.w,h:r.h,
+                 color:drawing.color, label:'未命名標籤', groupId:null};
+      rects.push(R); setSelection([R.id]);
+    }
+    drawing=null; render();
+  } else if(moving){
+    if(moving.moved && !moving.copied) pushHistory();
+    else if(moving.moved && moving.copied) {/* 已於複製時 pushHistory */}
+    moving=null; render();
+  } else if(resizing){
+    pushHistory(); resizing=null; render();
+  }
+});
+
+function applyResize(p){
+  const R = rects.find(x=>x.id===resizing.id);
+  const o = resizing.orig, h=resizing.handle;
+  let x=o.x, y=o.y, w=o.w, hh=o.h;
+  if(h.includes('e')) w = p.x - o.x;
+  if(h.includes('s')) hh = p.y - o.y;
+  if(h.includes('w')){ w = (o.x+o.w) - p.x; x = p.x; }
+  if(h.includes('n')){ hh = (o.y+o.h) - p.y; y = p.y; }
+  if(w<0){ x = x + w; w = -w; flipH(); }
+  if(hh<0){ y = y + hh; hh = -hh; flipV(); }
+  function flipH(){ resizing.handle = resizing.handle.replace('e','X').replace('w','e').replace('X','w'); }
+  function flipV(){ resizing.handle = resizing.handle.replace('s','X').replace('n','s').replace('X','n'); }
+  R.x=x; R.y=y; R.w=Math.max(4,w); R.h=Math.max(4,hh);
+}
+
+/* =========================================================
+   複製 / 貼上 / 剪下
+   ========================================================= */
+let clipboard=null;
+function serializeSelection(){
+  const sel = [...selection].map(id=>rects.find(r=>r.id===id)).filter(Boolean);
+  const gids = new Set(sel.filter(r=>r.groupId).map(r=>r.groupId));
+  return {
+    rects: sel.map(r=>({...r})),
+    groups: [...gids].map(g=>({gid:g, ...groups[g]}))
+  };
+}
+function cloneSelection(){ // 原地複製（給 Ctrl/Alt 拖曳），回傳新 id
+  const data = serializeSelection();
+  return pasteData(data, 0, 0);
+}
+function pasteData(data, ox, oy){
+  const gidMap={};
+  data.groups.forEach(g=>{ const ng='g'+(gidc++); groups[ng]={label:g.label,color:g.color}; gidMap[g.gid]=ng; });
+  const newIds=[];
+  data.rects.forEach(r=>{
+    const nr={...r, id:idc++, x:r.x+ox, y:r.y+oy,
+              groupId: r.groupId? gidMap[r.groupId]: null};
+    rects.push(nr); newIds.push(nr.id);
+  });
+  return newIds;
+}
+function copySel(){ if(selection.size) clipboard=serializeSelection(); }
+function cutSel(){ if(!selection.size) return; pushHistory(); clipboard=serializeSelection(); deleteSelected(false); render(); }
+function pasteSel(){
+  if(!clipboard) return; pushHistory();
+  const ids = pasteData(clipboard, S, S);
+  setSelection(ids); render();
+}
+
+/* =========================================================
+   刪除 / 群組 / 清除
+   ========================================================= */
+function deleteSelected(hist=true){
+  if(!selection.size) return;
+  if(hist) pushHistory();
+  rects = rects.filter(r=>!selection.has(r.id));
+  cleanupGroups();
+  selection.clear(); updateStatus(); render();
+}
+function cleanupGroups(){
+  for(const gid in groups){
+    if(!rects.some(r=>r.groupId===gid)) delete groups[gid];
+  }
+}
+function groupSel(){
+  // 只群組一般方框；深灰色實心（預設標題）不納入群組
+  const sel=[...selection].map(id=>rects.find(r=>r.id===id)).filter(Boolean)
+                          .filter(r=>r.kind==='draw');
+  if(sel.length<2) return;
+  pushHistory();
+  const gid = 'g'+(gidc++);
+  const color = randomColor();
+  groups[gid]={label:'未命名群組', color};
+  for(const R of sel){
+    R._origColor = R._origColor ?? R.color;
+    R._origLabel = R._origLabel ?? R.label;
+    R.groupId = gid;
+  }
+  // 選取狀態改為群組成員
+  setSelection(sel.map(r=>r.id));
+  cleanupGroups(); render();
+}
+function ungroupSel(){
+  const gids = new Set([...selection].map(id=>rects.find(r=>r.id===id)).filter(Boolean)
+                      .filter(r=>r.groupId).map(r=>r.groupId));
+  if(!gids.size) return;
+  pushHistory();
+  for(const gid of gids){
+    for(const R of rects.filter(r=>r.groupId===gid)){
+      if(R._origColor!==undefined){ R.color=R._origColor; delete R._origColor; }
+      if(R._origLabel!==undefined){ R.label=R._origLabel; delete R._origLabel; }
+      R.groupId=null;
+    }
+    delete groups[gid];
+  }
+  render();
+}
+function clearAll(){
+  if(!rects.length) return;
+  pushHistory();
+  rects=[]; groups={}; selection.clear(); updateStatus(); render();
+}
+
+/* =========================================================
+   預設標題新增（畫面正中央）
+   ========================================================= */
+function addPreset(p){
+  pushHistory();
+  const {w,h}=presetSize(p);
+  const cx=originX+gridW/2, cy=originY+gridH/2;
+  const R={id:idc++, kind:'preset', name:p.name,
+           x:cx-w/2, y:cy-h/2, w, h, groupId:null, resizable:!!p.resizable};
+  rects.push(R); setSelection([R.id]); render();
+}
+function addImageBox(){
+  pushHistory();
+  const h = 23*S + 22*ROW_GAP;         // 高 23 行（含 22 行間距）
+  const w = 3*COL_W + 2*COL_GAP;       // 寬 3 欄（含 2 欄間距）
+  const cx=originX+gridW/2, cy=originY+gridH/2;
+  const R={id:idc++, kind:'image', x:cx-w/2, y:cy-h/2, w, h, groupId:null, resizable:true};
+  rects.push(R); setSelection([R.id]); render();
+}
+
+/* =========================================================
+   標籤編輯
+   ========================================================= */
+const labelInput = document.getElementById('labelInput');
+let editing=null; // {type:'rect'|'group', id}
+canvas.addEventListener('dblclick', e=>{
+  const p=evtWorld(e);
+  const R=rectAt(p.x,p.y);
+  if(!R) return;
+  if(R.kind==='preset') return;
+  if(R.groupId){ startEdit('group', R.groupId, R); }
+  else { startEdit('rect', R.id, R); }
+});
+function startEdit(type,id,R){
+  editing={type,id};
+  const cur = type==='group'? groups[id].label : R.label;
+  let cx,cy,w;
+  if(type==='group'){ const bb=groupBBox(rects.filter(r=>r.groupId===id)); cx=bb.x+bb.w/2; cy=bb.y+bb.h/2; w=bb.w; }
+  else { cx=R.x+R.w/2; cy=R.y+R.h/2; w=R.w; }
+  const cr=canvas.getBoundingClientRect();
+  labelInput.style.display='block';
+  labelInput.style.left=(cr.left+cx*scale)+'px';
+  labelInput.style.top =(cr.top +(cy+ (type==='group'?18:14))*scale)+'px';
+  labelInput.style.width=Math.max(90, Math.min(w*scale*0.9, 220))+'px';
+  labelInput.style.fontSize=Math.max(11,Math.min(16, 13))+'px';
+  labelInput.value=cur;
+  labelInput.focus(); labelInput.select();
+}
+function commitLabel(){
+  if(!editing) return;
+  const v=labelInput.value;
+  if(editing.type==='group'){ if(groups[editing.id]){ pushHistory(); groups[editing.id].label=v; } }
+  else { const R=rects.find(r=>r.id===editing.id); if(R){ pushHistory(); R.label=v; } }
+  editing=null; labelInput.style.display='none'; labelInput.style.textAlign='center'; render();
+}
+labelInput.addEventListener('keydown', e=>{
+  e.stopPropagation();
+  if(e.key==='Enter'){ commitLabel(); }
+  else if(e.key==='Escape'){ editing=null; labelInput.style.display='none'; labelInput.style.textAlign='center'; }
+});
+labelInput.addEventListener('blur', ()=>{ if(editing) commitLabel(); });
+
+/* =========================================================
+   復原 / 重做（最多 10 步）
+   ========================================================= */
+const HIST_MAX=10;
+let undoStack=[], redoStack=[];
+function snapshot(){ return JSON.stringify({rects,groups,idc,gidc,header}); }
+function restore(s){
+  const o=JSON.parse(s);
+  rects=o.rects; groups=o.groups; idc=o.idc; gidc=o.gidc;
+  header=o.header||{editor:'',date:''};
+  if(hdrEditor) hdrEditor.value=header.editor||'';
+  if(hdrDate)   hdrDate.value  =header.date||'';
+  selection.clear(); updateStatus(); render();
+}
+function pushHistory(){
+  undoStack.push(snapshot());
+  if(undoStack.length>HIST_MAX) undoStack.shift();
+  redoStack=[];
+}
+function undo(){
+  if(!undoStack.length) return;
+  redoStack.push(snapshot());
+  restore(undoStack.pop());
+}
+function redo(){
+  if(!redoStack.length) return;
+  undoStack.push(snapshot());
+  restore(redoStack.pop());
+}
+
+/* =========================================================
+   鍵盤
+   ========================================================= */
+window.addEventListener('keydown', e=>{
+  const t=e.target;
+  if(t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.isContentEditable)) return; // 於輸入框中不攔截
+  if(editing) return; // 交給輸入框
+  const ck = e.ctrlKey||e.metaKey;
+  if((e.key==='Delete'||e.key==='Backspace')){ e.preventDefault(); deleteSelected(); return; }
+  if(ck && (e.key==='z'||e.key==='Z')){
+    e.preventDefault();
+    if(e.shiftKey) redo(); else undo(); return;
+  }
+  if(ck && (e.key==='y'||e.key==='Y')){ e.preventDefault(); redo(); return; }
+  if(ck && (e.key==='c'||e.key==='C')){ e.preventDefault(); copySel(); return; }
+  if(ck && (e.key==='x'||e.key==='X')){ e.preventDefault(); cutSel(); return; }
+  if(ck && (e.key==='v'||e.key==='V')){ e.preventDefault(); pasteSel(); return; }
+  if(ck && (e.key==='g'||e.key==='G')){
+    e.preventDefault();
+    if(e.shiftKey) ungroupSel(); else groupSel(); return;
+  }
+  if(e.key==='Escape'){ setSelection([]); render(); }
+});
+
+/* =========================================================
+   縮放：Ctrl + 滾輪
+   ========================================================= */
+stage.addEventListener('wheel', e=>{
+  if(!(e.ctrlKey||e.metaKey)) return;   // 一般滾輪 -> 捲動
+  e.preventDefault();
+  const sr = stage.getBoundingClientRect();
+  const mx = e.clientX - sr.left + stage.scrollLeft;  // 內容座標
+  const my = e.clientY - sr.top  + stage.scrollTop;
+  const wx = mx/scale, wy = my/scale;
+  const old=scale;
+  const factor = e.deltaY<0 ? 1.1 : 1/1.1;
+  scale = Math.max(minScale, Math.min(maxScale, scale*factor));
+  if(scale===old) return;
+  applyScale();
+  stage.scrollLeft = wx*scale - (e.clientX - sr.left);
+  stage.scrollTop  = wy*scale - (e.clientY - sr.top);
+}, {passive:false});
+
+document.querySelectorAll('[data-zoom]').forEach(b=>{
+  b.onclick=()=>{
+    const sr=stage.getBoundingClientRect();
+    const cx=sr.width/2+stage.scrollLeft, cy=sr.height/2+stage.scrollTop;
+    const wx=cx/scale, wy=cy/scale;
+    scale = b.dataset.zoom==='in'? scale*1.15 : scale/1.15;
+    applyScale();
+    stage.scrollLeft=wx*scale-sr.width/2;
+    stage.scrollTop =wy*scale-sr.height/2;
+  };
+});
+document.getElementById('fitBtn').onclick=()=>{ scale=fitPageScale()*0.98; applyScale(); stage.scrollTop=0; stage.scrollLeft=0; };
+
+/* =========================================================
+   狀態列
+   ========================================================= */
+function updateStatus(){
+  const box=document.getElementById('statusBox');
+  const sel=[...selection].map(id=>rects.find(r=>r.id===id)).filter(Boolean);
+  if(!sel.length){ box.innerHTML='尚未選取任何方框。'; return; }
+  const gids=new Set(sel.filter(r=>r.groupId).map(r=>r.groupId));
+  if(gids.size===1 && sel.every(r=>r.groupId)){
+    const cnt=unionCount(sel);
+    box.innerHTML=`已選群組（${sel.length} 個方框），合計 <b>${cnt}</b> 格。`;
+    return;
+  }
+  if(sel.length===1 && sel[0].kind==='draw'){
+    box.innerHTML=`已選 1 個方框，含 <b>${countSquares(sel[0].x,sel[0].y,sel[0].w,sel[0].h)}</b> 格。`;
+    return;
+  }
+  const total=unionCount(sel.filter(r=>r.kind!=='preset'));
+  box.innerHTML=`已選 ${sel.length} 個物件，覆蓋 <b>${total}</b> 格。`;
+}
+
+/* =========================================================
+   匯出 JPG
+   ========================================================= */
+document.getElementById('exportBtn').onclick=()=>{
+  const savedSel = new Set(selection); selection.clear();
+  const ex = document.createElement('canvas');
+  const es = 2;                               // 匯出解析度倍率
+  ex.width = Math.round(worldW*es);
+  ex.height= Math.round(worldH*es);
+  const ex2 = ex.getContext('2d');
+  ex2.setTransform(es,0,0,es,0,0);
+  // 白底
+  ex2.fillStyle='#fff'; ex2.fillRect(0,0,worldW,worldH);
+  // 格線
+  ex2.lineWidth=1; ex2.strokeStyle=COL_BORDER;
+  for(let c=0;c<N_COLS;c++) for(let i=0;i<N_SQ;i++) for(let r=0;r<N_ROWS;r++){
+    const x=sqX(c,i),y=sqY(r);
+    ex2.fillStyle=(r<DARK_ROWS)?COL_DARK:COL_LIGHT;
+    ex2.fillRect(x,y,S,S);
+    ex2.strokeRect(x+0.5,y+0.5,S-1,S-1);
+  }
+  // 內容（標題/署名 + 方框 + 群組，乾淨版，無選取控制點與提示字）
+  drawContent(ex2, true);
+  // 還原選取
+  savedSel.forEach(id=>selection.add(id));
+  render();
+
+  const d=new Date();
+  const ymd = d.getFullYear().toString()
+            + String(d.getMonth()+1).padStart(2,'0')
+            + String(d.getDate()).padStart(2,'0');
+  const a=document.createElement('a');
+  a.download = `${ymd}-大學報版面字數統計.jpg`;
+  a.href = ex.toDataURL('image/jpeg', 0.95);
+  a.click();
+};
+
+// 依框寬縮小字級以不超出寬度
+function fitTextC(c,text,maxW,base){
+  c.font=`700 ${base}px "Noto Sans TC",sans-serif`; let s=base;
+  while(s>7 && c.measureText(text).width>maxW){ s--; c.font=`700 ${s}px "Noto Sans TC",sans-serif`; }
+  return s;
+}
+
+/* =========================================================
+   面板按鈕
+   ========================================================= */
+document.getElementById('clearBtn').onclick=clearAll;
+document.getElementById('imageBtn').onclick=addImageBox;
+
+/* =========================================================
+   啟動
+   ========================================================= */
+function init(){
+  recomputeBounds();
+  scale = fitWidthScale();
+  applyScale();
+}
+window.addEventListener('resize', ()=>{
+  const wasFitW = Math.abs(scale-fitWidthScale())<0.001;
+  recomputeBounds();
+  if(wasFitW) scale=fitWidthScale();
+  applyScale();
+});
+init();
+</script>
+</body>
+</html>

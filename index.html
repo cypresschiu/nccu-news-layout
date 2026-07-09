@@ -143,7 +143,7 @@
 
   <aside id="panel">
     <div class="panel-inner">
-      <p class="tagline">在左側格線上拖曳出方框計算字數（框線若壓在格子上，該格也會被計算）。或用下方按鈕產生區塊擺放版位。</p>
+      <p class="tagline">在左側格線上拖曳出方框計算字數（框線若壓在格子上，該格也會被計算）。或用下方按鈕產生區塊擺放版位。頭版自第18行（最左方有一深灰格）開始。</p>
 
       <div class="group-title">預設標題字數參考</div>
       <div class="preset-grid" id="presetGrid"></div>
@@ -203,9 +203,12 @@ const worldH = HEADER_H + PAD + gridH + PAD + FOOTER_H;
 const COL_LIGHT = "#e6e6e8";
 const COL_DARK  = "#b4b4b8";
 const COL_BORDER= "#ffffff";
+// 哪些小格子填深灰：前 6 行（r 0–5）＋ 第 18 行最左邊一格（r=17、第 0 欄第 0 格）
+function isDarkCell(c, i, r){ return r < DARK_ROWS || (r === 17 && c === 0 && i === 0); }
 
 function sqX(c,i){ return originX + c*(COL_W+COL_GAP) + i*S; }
 function sqY(r){ return originY + r*(S+ROW_GAP); }
+
 
 /* 計算矩形壓到幾個小格子（含框線壓到的） */
 function countSquares(x,y,w,h){
@@ -311,7 +314,7 @@ function buildGrid(){
     for(let i=0;i<N_SQ;i++){
       for(let r=0;r<N_ROWS;r++){
         const x=sqX(c,i), y=sqY(r);
-        gctx.fillStyle = (r<DARK_ROWS)? COL_DARK : COL_LIGHT;
+        gctx.fillStyle = isDarkCell(c,i,r)? COL_DARK : COL_LIGHT;
         gctx.fillRect(x,y,S,S);
         gctx.strokeRect(x+0.5, y+0.5, S-1, S-1);
       }
@@ -452,12 +455,28 @@ function computeHeaderZones(c){
   };
 }
 
+// 標題左側 logo（SVG），需與 index.html 放在同一資料夾
+const logoImg = new Image();
+let logoReady = false;
+logoImg.onload = ()=>{ logoReady = true; render(); };
+logoImg.src = 'nccu-news-logo.svg';
+
 function drawHeaderFooter(c, forExport){
-  // 左側標題（放大 1.5 倍）
+  // 左側：logo（與字同高）+ 標題（放大 2 倍）
   c.textAlign='left'; c.textBaseline='middle';
-  const tf = Math.min(HEADER_H*0.5, 27) * 1.5;
-  c.font = `800 ${tf}px "Noto Sans TC",sans-serif`; c.fillStyle="#2a2b2e";
-  c.fillText('大學報版面字數統計小工具', originX, HEADER_H*0.5);
+  const tf = Math.min(HEADER_H*1, 27) * 2;
+  const titleCy = HEADER_H*1;
+  let tx = originX;
+  if(logoReady){
+    const logoH = tf;
+    const ar = (logoImg.naturalWidth && logoImg.naturalHeight)
+                 ? logoImg.naturalWidth/logoImg.naturalHeight : 1;
+    const logoW = logoH * ar;
+    c.drawImage(logoImg, originX, titleCy - logoH/2, logoW, logoH);
+    tx = originX + logoW + tf*0.35;
+  }
+  c.font = `700 ${tf}px "Noto Sans TC",sans-serif`; c.fillStyle="#2a2b2e";
+  c.fillText('版面字數統計小工具', tx, titleCy);
   // 右側 編輯／日期 標籤與底線（值由畫面上的輸入框顯示；匯出時才把值畫進圖）
   const z = computeHeaderZones(c);
   for(const key of ['editor','date']){
@@ -481,7 +500,7 @@ function drawHeaderFooter(c, forExport){
     c.textAlign='center'; c.textBaseline='middle';
     c.font = `500 ${Math.min(FOOTER_H*0.42,14)}px "Noto Sans TC",sans-serif`;
     c.fillStyle="#9a9da3";
-    c.fillText('Designed by Roderick Chiu｜Built via vibe coding with Claude', worldW/2, worldH - FOOTER_H*0.5);
+    c.fillText('Designed by Roderick Chiu｜Built via vibe coding with Claude', worldW/2, worldH - FOOTER_H*1);
   }
 }
 
@@ -1000,7 +1019,7 @@ document.getElementById('exportBtn').onclick=()=>{
   ex2.lineWidth=1; ex2.strokeStyle=COL_BORDER;
   for(let c=0;c<N_COLS;c++) for(let i=0;i<N_SQ;i++) for(let r=0;r<N_ROWS;r++){
     const x=sqX(c,i),y=sqY(r);
-    ex2.fillStyle=(r<DARK_ROWS)?COL_DARK:COL_LIGHT;
+    ex2.fillStyle=isDarkCell(c,i,r)?COL_DARK:COL_LIGHT;
     ex2.fillRect(x,y,S,S);
     ex2.strokeRect(x+0.5,y+0.5,S-1,S-1);
   }

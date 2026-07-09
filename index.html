@@ -151,7 +151,7 @@
       <div class="group-title">圖片</div>
       <div class="preset-grid">
         <button class="preset-btn" id="imageBtn" title="空心打叉的圖片框">圖片框</button>
-        <button class="preset-btn" id="captionBtn" title="空心無斜線的圖說框">圖說框</button>
+        <button class="preset-btn" id="captionBtn" title="估算字數的圖說框，可雙擊改字或清空成框線">圖說／框線</button>
       </div>
 
       <div class="group-title">頁面工具</div>
@@ -167,6 +167,7 @@
       <div class="group-title">操作說明</div>
       <div class="hint">
         <b>文字框：</b>在空白處拖曳即可畫出文字框，畫完改大小，並可群組合併計算空格數。雙擊文字框標籤可修改文字。<br>
+        <b>圖說／框線：</b>可新增估算字數的圖說框，亦可雙擊標籤修改文字內容，或刪除文字讓它變成單純的矩形框線。<br>
         <b>選取：</b>點框選取，<kbd>Shift</kbd>＋點按可多選。<br>
         <b>複製：</b><kbd>Ctrl</kbd> 或 <kbd>Alt</kbd> 拖曳可複製一份。<br>
         <b>刪除：</b>選取後按 <kbd>Delete</kbd> / <kbd>Backspace</kbd>。<br>
@@ -399,14 +400,21 @@ function drawImageBoxOn(c, R){
   c.stroke();
 }
 
+function captionText(R){
+  // 未編輯過(label 為 undefined) -> 動態估算字數；已編輯 -> 使用自訂文字（可為空字串）
+  if(R.label === undefined || R.label === null){
+    return `圖說 (約${countSquares(R.x, R.y, R.w, R.h)}字)`;
+  }
+  return R.label;
+}
 function drawCaptionBoxOn(c, R){
-  // 空心粗框（同圖片框樣式，無斜線），中央顯示「圖說 (約N字)」
+  // 空心粗框（同圖片框樣式，無斜線）
   c.strokeStyle = "#4a4c52";
   c.lineWidth = 4;
   c.lineJoin = 'miter';
   c.strokeRect(R.x, R.y, R.w, R.h);
-  const n = countSquares(R.x, R.y, R.w, R.h);
-  const txt = `圖說 (約${n}字)`;
+  const txt = captionText(R);
+  if(!txt) return;                                  // 文字被刪空 -> 只剩框線
   const {nf} = baseSizes(R.w, R.h, false);
   const fs = fitTextC(c, txt, R.w*0.9, nf) * 0.5;   // 顯示文字縮小 50%
   c.font = `800 ${fs}px "Noto Sans TC",sans-serif`;
@@ -798,6 +806,7 @@ function pasteData(data, ox, oy){
               groupId: r.groupId? gidMap[r.groupId]: null};
     rects.push(nr); newIds.push(nr.id);
   });
+  sinkCaptions();
   return newIds;
 }
 function copySel(){ if(selection.size) clipboard=serializeSelection(); }
@@ -881,13 +890,20 @@ function addImageBox(){
   const R={id:idc++, kind:'image', x:cx-w/2, y:cy-h/2, w, h, groupId:null, resizable:true};
   rects.push(R); setSelection([R.id]); render();
 }
+// 讓所有圖說框永遠位於最底層（其餘物件保持原相對順序），
+// 這樣圖說框框內若有其他物件，點選時會優先選到上層的其他物件
+function sinkCaptions(){
+  const caps = rects.filter(r=>r.kind==='caption');
+  const rest = rects.filter(r=>r.kind!=='caption');
+  rects = caps.concat(rest);
+}
 function addCaptionBox(){
   pushHistory();
   const h = 4*S + 3*ROW_GAP;           // 預設高 4 行（可自行拉大小）
   const w = 2*COL_W + COL_GAP;         // 預設寬 2 欄
   const cx=originX+gridW/2, cy=originY+gridH/2;
   const R={id:idc++, kind:'caption', x:cx-w/2, y:cy-h/2, w, h, groupId:null, resizable:true};
-  rects.push(R); setSelection([R.id]); render();
+  rects.push(R); sinkCaptions(); setSelection([R.id]); render();
 }
 
 /* =========================================================
@@ -901,13 +917,16 @@ canvas.addEventListener('dblclick', e=>{
   if(!R) return;
   if(R.kind==='preset'){ if(R.resizable) startEdit('preset', R.id, R); return; } // 僅「自由標題框」可改名
   if(R.kind==='image') return;
-  if(R.kind==='caption') return;
+  if(R.kind==='caption'){ startEdit('caption', R.id, R); return; }
   if(R.groupId){ startEdit('group', R.groupId, R); }
   else { startEdit('rect', R.id, R); }
 });
 function startEdit(type,id,R){
   editing={type,id};
-  const cur = type==='group'? groups[id].label : (type==='preset'? R.name : R.label);
+  const cur = type==='group'? groups[id].label
+            : type==='preset'? R.name
+            : type==='caption'? captionText(R)
+            : R.label;
   let cx,cy,w;
   if(type==='group'){ const M=groupLargest(id); cx=M.x+M.w/2; cy=M.y+M.h/2; w=M.w; }
   else { cx=R.x+R.w/2; cy=R.y+R.h/2; w=R.w; }
@@ -925,6 +944,7 @@ function commitLabel(){
   const v=labelInput.value;
   if(editing.type==='group'){ if(groups[editing.id]){ pushHistory(); groups[editing.id].label=v; } }
   else if(editing.type==='preset'){ const R=rects.find(r=>r.id===editing.id); if(R){ pushHistory(); R.name=v; } }
+  else if(editing.type==='caption'){ const R=rects.find(r=>r.id===editing.id); if(R){ pushHistory(); R.label=v; } }
   else { const R=rects.find(r=>r.id===editing.id); if(R){ pushHistory(); R.label=v; } }
   editing=null; labelInput.style.display='none'; labelInput.style.textAlign='center'; render();
 }
@@ -945,6 +965,7 @@ function restore(s){
   const o=JSON.parse(s);
   rects=o.rects; groups=o.groups; idc=o.idc; gidc=o.gidc;
   header=o.header||{editor:'',date:''};
+  sinkCaptions();
   if(hdrEditor) hdrEditor.value=header.editor||'';
   if(hdrDate)   hdrDate.value  =header.date||'';
   selection.clear(); updateStatus(); render();

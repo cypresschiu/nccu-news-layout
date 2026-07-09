@@ -208,7 +208,7 @@ const COL_LIGHT = "#e6e6e8";
 const COL_DARK  = "#b4b4b8";
 const COL_BORDER= "#ffffff";
 // 標題深灰框底色：alpha=0.2（即 80% 透明）。想改「不透明度 80%」就把 0.2 改成 0.8
-const TITLE_FILL = "rgba(74,76,82,0.2)";
+const TITLE_FILL = "rgba(74,76,82,0.8)";
 // 哪些小格子填深灰：前 6 行（r 0–5）＋ 第 18 行最左邊一格（r=17、第 0 欄第 0 格）
 function isDarkCell(c, i, r){ return r < DARK_ROWS || (r === 17 && c === 0 && i === 0); }
 

@@ -874,20 +874,23 @@ function clearAll(){
 /* =========================================================
    預設標題新增（畫面正中央）
    ========================================================= */
+// 產生的圖形對齊「最右上角小格子的右上角」：
+// 右邊界靠齊 originX+gridW（格線右緣）、頂端靠齊 originY（格線上緣）
+function spawnXY(w){ return { x: originX + gridW - w, y: originY }; }
 function addPreset(p){
   pushHistory();
   const {w,h}=presetSize(p);
-  const cx=originX+gridW/2, cy=originY+gridH/2;
+  const {x,y}=spawnXY(w);
   const R={id:idc++, kind:'preset', name:p.name,
-           x:cx-w/2, y:cy-h/2, w, h, groupId:null, resizable:!!p.resizable};
+           x, y, w, h, groupId:null, resizable:!!p.resizable};
   rects.push(R); setSelection([R.id]); render();
 }
 function addImageBox(){
   pushHistory();
   const h = 23*S + 22*ROW_GAP;         // 高 23 行（含 22 行間距）
   const w = 3*COL_W + 2*COL_GAP;       // 寬 3 欄（含 2 欄間距）
-  const cx=originX+gridW/2, cy=originY+gridH/2;
-  const R={id:idc++, kind:'image', x:cx-w/2, y:cy-h/2, w, h, groupId:null, resizable:true};
+  const {x,y}=spawnXY(w);
+  const R={id:idc++, kind:'image', x, y, w, h, groupId:null, resizable:true};
   rects.push(R); setSelection([R.id]); render();
 }
 // 讓所有圖說框永遠位於最底層（其餘物件保持原相對順序），
@@ -901,8 +904,8 @@ function addCaptionBox(){
   pushHistory();
   const h = 4*S + 3*ROW_GAP;           // 預設高 4 行（可自行拉大小）
   const w = 2*COL_W + COL_GAP;         // 預設寬 2 欄
-  const cx=originX+gridW/2, cy=originY+gridH/2;
-  const R={id:idc++, kind:'caption', x:cx-w/2, y:cy-h/2, w, h, groupId:null, resizable:true};
+  const {x,y}=spawnXY(w);
+  const R={id:idc++, kind:'caption', x, y, w, h, groupId:null, resizable:true};
   rects.push(R); sinkCaptions(); setSelection([R.id]); render();
 }
 

@@ -149,7 +149,10 @@
       <div class="preset-grid" id="presetGrid"></div>
 
       <div class="group-title">圖片</div>
-      <button class="preset-btn" id="imageBtn" title="空心打叉的圖片框" style="width:100%;">圖片框</button>
+      <div class="preset-grid">
+        <button class="preset-btn" id="imageBtn" title="空心打叉的圖片框">圖片框</button>
+        <button class="preset-btn" id="captionBtn" title="空心無斜線的圖說框">圖說框</button>
+      </div>
 
       <div class="group-title">頁面工具</div>
       <div class="zoombar">
@@ -203,6 +206,8 @@ const worldH = HEADER_H + PAD + gridH + PAD + FOOTER_H;
 const COL_LIGHT = "#e6e6e8";
 const COL_DARK  = "#b4b4b8";
 const COL_BORDER= "#ffffff";
+// 標題深灰框底色：alpha=0.2（即 80% 透明）。想改「不透明度 80%」就把 0.2 改成 0.8
+const TITLE_FILL = "rgba(74,76,82,0.2)";
 // 哪些小格子填深灰：前 6 行（r 0–5）＋ 第 18 行最左邊一格（r=17、第 0 欄第 0 格）
 function isDarkCell(c, i, r){ return r < DARK_ROWS || (r === 17 && c === 0 && i === 0); }
 
@@ -375,7 +380,7 @@ function drawStacked(c, cx, cy, numStr, labelStr, nf, lf, gap, numColor, labelCo
 }
 
 function drawPresetOn(c, R){
-  c.fillStyle = "#4a4c52"; c.fillRect(R.x, R.y, R.w, R.h);
+  c.fillStyle = TITLE_FILL; c.fillRect(R.x, R.y, R.w, R.h);
   const fs = fitTextC(c, R.name, R.w*0.9, Math.min(R.h*0.32, 30));
   c.font = `700 ${fs}px "Noto Sans TC",sans-serif`; c.fillStyle="#fff";
   c.textAlign='center'; c.textBaseline='middle';
@@ -394,9 +399,26 @@ function drawImageBoxOn(c, R){
   c.stroke();
 }
 
+function drawCaptionBoxOn(c, R){
+  // 空心粗框（同圖片框樣式，無斜線），中央顯示「圖說 (約N字)」
+  c.strokeStyle = "#4a4c52";
+  c.lineWidth = 4;
+  c.lineJoin = 'miter';
+  c.strokeRect(R.x, R.y, R.w, R.h);
+  const n = countSquares(R.x, R.y, R.w, R.h);
+  const txt = `圖說 (約${n}字)`;
+  const {nf} = baseSizes(R.w, R.h, false);
+  const fs = fitTextC(c, txt, R.w*0.9, nf) * 0.5;   // 顯示文字縮小 50%
+  c.font = `800 ${fs}px "Noto Sans TC",sans-serif`;
+  c.fillStyle = "#33353b";
+  c.textAlign='center'; c.textBaseline='middle';
+  c.fillText(txt, R.x+R.w/2, R.y+R.h/2);
+}
+
 function drawRectOn(c, R){
   if(R.kind==='preset'){ drawPresetOn(c, R); return; }
   if(R.kind==='image'){ drawImageBoxOn(c, R); return; }
+  if(R.kind==='caption'){ drawCaptionBoxOn(c, R); return; }
   if(R.groupId){
     c.lineWidth = 1.8;
     c.strokeStyle = (groups[R.groupId]&&groups[R.groupId].color)||R.color||'#e879b9';
@@ -424,17 +446,25 @@ function countWithRows(n){
   return `${n} (${r}行)`;
 }
 
+// 群組中面積最大的成員框（合併文字顯示於其正中央）
+function groupLargest(gid){
+  const members = rects.filter(r=>r.groupId===gid);
+  let M = members[0];
+  for(const m of members){ if(M && m.w*m.h > M.w*M.h) M = m; }
+  return M;
+}
+
 function drawGroupTextOn(c, gid){
   const members = rects.filter(r=>r.groupId===gid);
   if(!members.length) return;
-  const bb = groupBBox(members);
   const cnt = countWithRows(unionCount(members));
   const g = groups[gid];
   const hasLabel = g.label && g.label.length>0;
-  let {nf,lf,gap} = baseSizes(bb.w, bb.h, hasLabel);
-  nf = fitTextC(c, cnt, bb.w*0.9, nf);
-  if(hasLabel) lf = fitTextC(c, g.label, bb.w*0.9, lf);
-  drawStacked(c, bb.x+bb.w/2, bb.y+bb.h/2, cnt, g.label, nf, lf, gap, "#2a2b2e", "#6a6d73");
+  const M = groupLargest(gid);                 // 置於最大成員框正中央
+  let {nf,lf,gap} = baseSizes(M.w, M.h, hasLabel);
+  nf = fitTextC(c, cnt, M.w*0.9, nf);
+  if(hasLabel) lf = fitTextC(c, g.label, M.w*0.9, lf);
+  drawStacked(c, M.x+M.w/2, M.y+M.h/2, cnt, g.label, nf, lf, gap, "#2a2b2e", "#6a6d73");
 }
 
 /* 頂部標題列（左標題 + 右方可編輯的 編輯/日期）
@@ -851,6 +881,14 @@ function addImageBox(){
   const R={id:idc++, kind:'image', x:cx-w/2, y:cy-h/2, w, h, groupId:null, resizable:true};
   rects.push(R); setSelection([R.id]); render();
 }
+function addCaptionBox(){
+  pushHistory();
+  const h = 4*S + 3*ROW_GAP;           // 預設高 4 行（可自行拉大小）
+  const w = 2*COL_W + COL_GAP;         // 預設寬 2 欄
+  const cx=originX+gridW/2, cy=originY+gridH/2;
+  const R={id:idc++, kind:'caption', x:cx-w/2, y:cy-h/2, w, h, groupId:null, resizable:true};
+  rects.push(R); setSelection([R.id]); render();
+}
 
 /* =========================================================
    標籤編輯
@@ -861,16 +899,17 @@ canvas.addEventListener('dblclick', e=>{
   const p=evtWorld(e);
   const R=rectAt(p.x,p.y);
   if(!R) return;
-  if(R.kind==='preset') return;
+  if(R.kind==='preset'){ if(R.resizable) startEdit('preset', R.id, R); return; } // 僅「自由標題框」可改名
   if(R.kind==='image') return;
+  if(R.kind==='caption') return;
   if(R.groupId){ startEdit('group', R.groupId, R); }
   else { startEdit('rect', R.id, R); }
 });
 function startEdit(type,id,R){
   editing={type,id};
-  const cur = type==='group'? groups[id].label : R.label;
+  const cur = type==='group'? groups[id].label : (type==='preset'? R.name : R.label);
   let cx,cy,w;
-  if(type==='group'){ const bb=groupBBox(rects.filter(r=>r.groupId===id)); cx=bb.x+bb.w/2; cy=bb.y+bb.h/2; w=bb.w; }
+  if(type==='group'){ const M=groupLargest(id); cx=M.x+M.w/2; cy=M.y+M.h/2; w=M.w; }
   else { cx=R.x+R.w/2; cy=R.y+R.h/2; w=R.w; }
   const cr=canvas.getBoundingClientRect();
   labelInput.style.display='block';
@@ -885,6 +924,7 @@ function commitLabel(){
   if(!editing) return;
   const v=labelInput.value;
   if(editing.type==='group'){ if(groups[editing.id]){ pushHistory(); groups[editing.id].label=v; } }
+  else if(editing.type==='preset'){ const R=rects.find(r=>r.id===editing.id); if(R){ pushHistory(); R.name=v; } }
   else { const R=rects.find(r=>r.id===editing.id); if(R){ pushHistory(); R.label=v; } }
   editing=null; labelInput.style.display='none'; labelInput.style.textAlign='center'; render();
 }
@@ -896,9 +936,9 @@ labelInput.addEventListener('keydown', e=>{
 labelInput.addEventListener('blur', ()=>{ if(editing) commitLabel(); });
 
 /* =========================================================
-   復原 / 重做（最多 10 步）
+   復原 / 重做（最多 20 步）
    ========================================================= */
-const HIST_MAX=10;
+const HIST_MAX=20;
 let undoStack=[], redoStack=[];
 function snapshot(){ return JSON.stringify({rects,groups,idc,gidc,header}); }
 function restore(s){
@@ -1051,6 +1091,7 @@ function fitTextC(c,text,maxW,base){
    ========================================================= */
 document.getElementById('clearBtn').onclick=clearAll;
 document.getElementById('imageBtn').onclick=addImageBox;
+document.getElementById('captionBtn').onclick=addCaptionBox;
 
 /* =========================================================
    啟動

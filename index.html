@@ -428,12 +428,8 @@ function drawRectOn(c, R){
   if(R.kind==='preset'){ drawPresetOn(c, R); return; }
   if(R.kind==='image'){ drawImageBoxOn(c, R); return; }
   if(R.kind==='caption'){ drawCaptionBoxOn(c, R); return; }
-  if(R.groupId){
-    c.lineWidth = 1.8;
-    c.strokeStyle = (groups[R.groupId]&&groups[R.groupId].color)||R.color||'#e879b9';
-    c.strokeRect(R.x, R.y, R.w, R.h); return;
-  }
-  c.lineWidth = 1.8; c.strokeStyle = R.color; c.strokeRect(R.x, R.y, R.w, R.h);
+  if(R.groupId){ return; }   // 群組成員的框線改由聯集外輪廓統一繪製
+  c.lineWidth = 4; c.strokeStyle = R.color; c.strokeRect(R.x, R.y, R.w, R.h);
   const cnt = countWithRows(countSquares(R.x,R.y,R.w,R.h));
   const hasLabel = R.label && R.label.length>0;
   let {nf,lf,gap} = baseSizes(R.w, R.h, hasLabel);
@@ -566,7 +562,54 @@ hdrDate.addEventListener('input',   ()=>{ header.date   = hdrDate.value; });
 function drawContent(c, forExport){
   drawHeaderFooter(c, forExport);
   for(const R of rects) drawRectOn(c, R);
+  for(const gid in groups) drawGroupOutlineFor(c, gid);   // 群組聯集最外框
   for(const gid in groups) drawGroupTextOn(c, gid);
+}
+
+// 只畫多個矩形「聯集」的最外輪廓（內部交疊/相鄰邊不畫）
+function drawGroupOutline(c, members, color, lw){
+  const eps = 0.5;
+  c.strokeStyle = color; c.lineWidth = lw; c.lineCap='square'; c.lineJoin='miter';
+  const insideAny = (px,py)=>{
+    for(const m of members){
+      if(px>m.x+eps && px<m.x+m.w-eps && py>m.y+eps && py<m.y+m.h-eps) return true;
+    }
+    return false;
+  };
+  const line=(x1,y1,x2,y2)=>{ c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke(); };
+  const uniq = arr => [...new Set(arr.map(v=>Math.round(v*1000)/1000))].sort((a,b)=>a-b);
+
+  for(const R of members){
+    const L=R.x, Rr=R.x+R.w, T=R.y, B=R.y+R.h;
+    // 垂直邊：x=L（外側在 x-）、x=Rr（外側在 x+）
+    const ys = uniq([T,B, ...members.flatMap(m=> m===R?[]:[m.y,m.y+m.h]).filter(v=>v>T && v<B)]);
+    for(const [X,ox] of [[L,-1],[Rr,1]]){
+      let start=null;
+      for(let k=0;k<ys.length-1;k++){
+        const draw = !insideAny(X + ox*2*eps, (ys[k]+ys[k+1])/2);
+        if(draw && start===null) start=ys[k];
+        if(!draw && start!==null){ line(X,start,X,ys[k]); start=null; }
+      }
+      if(start!==null) line(X,start,X,ys[ys.length-1]);
+    }
+    // 水平邊：y=T（外側在 y-）、y=B（外側在 y+）
+    const xs = uniq([L,Rr, ...members.flatMap(m=> m===R?[]:[m.x,m.x+m.w]).filter(v=>v>L && v<Rr)]);
+    for(const [Y,oy] of [[T,-1],[B,1]]){
+      let start=null;
+      for(let k=0;k<xs.length-1;k++){
+        const draw = !insideAny((xs[k]+xs[k+1])/2, Y + oy*2*eps);
+        if(draw && start===null) start=xs[k];
+        if(!draw && start!==null){ line(start,Y,xs[k],Y); start=null; }
+      }
+      if(start!==null) line(start,Y,xs[xs.length-1],Y);
+    }
+  }
+}
+function drawGroupOutlineFor(c, gid){
+  const members = rects.filter(r=>r.groupId===gid);
+  if(!members.length) return;
+  const color = (groups[gid]&&groups[gid].color) || '#e879b9';
+  drawGroupOutline(c, members, color, 4);
 }
 
 function render(){
@@ -701,6 +744,7 @@ canvas.addEventListener('mousedown', e=>{
   // 2) 點到方框
   const R = rectAt(p.x,p.y);
   if(R){
+    bringToFront(unitOf(R));                 // 點選的圖形移到最上層
     if(e.shiftKey){ toggleUnit(R); render(); return; }
     const ids = unitOf(R);
     const already = ids.every(i=>selection.has(i));
@@ -807,7 +851,6 @@ function pasteData(data, ox, oy){
               groupId: r.groupId? gidMap[r.groupId]: null};
     rects.push(nr); newIds.push(nr.id);
   });
-  sinkCaptions();
   return newIds;
 }
 function copySel(){ if(selection.size) clipboard=serializeSelection(); }
@@ -896,10 +939,12 @@ function addImageBox(){
 }
 // 讓所有圖說框永遠位於最底層（其餘物件保持原相對順序），
 // 這樣圖說框框內若有其他物件，點選時會優先選到上層的其他物件
-function sinkCaptions(){
-  const caps = rects.filter(r=>r.kind==='caption');
-  const rest = rects.filter(r=>r.kind!=='caption');
-  rects = caps.concat(rest);
+// 把指定的圖形移到最上層（保持彼此相對順序，其餘維持原順序）
+function bringToFront(ids){
+  const set = new Set(ids);
+  const moved = rects.filter(r=>set.has(r.id));
+  const rest  = rects.filter(r=>!set.has(r.id));
+  rects = rest.concat(moved);
 }
 function addCaptionBox(){
   pushHistory();
@@ -907,7 +952,7 @@ function addCaptionBox(){
   const w = 2*COL_W + COL_GAP;         // 預設寬 2 欄
   const {x,y}=spawnXY(w, 6);           // 對齊第 7 行最右格右上角
   const R={id:idc++, kind:'caption', x, y, w, h, groupId:null, resizable:true};
-  rects.push(R); sinkCaptions(); setSelection([R.id]); render();
+  rects.push(R); setSelection([R.id]); render();
 }
 
 /* =========================================================
@@ -969,7 +1014,6 @@ function restore(s){
   const o=JSON.parse(s);
   rects=o.rects; groups=o.groups; idc=o.idc; gidc=o.gidc;
   header=o.header||{editor:'',date:''};
-  sinkCaptions();
   if(hdrEditor) hdrEditor.value=header.editor||'';
   if(hdrDate)   hdrDate.value  =header.date||'';
   selection.clear(); updateStatus(); render();

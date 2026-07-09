@@ -143,7 +143,7 @@
 
   <aside id="panel">
     <div class="panel-inner">
-      <p class="tagline">在左側格線上拖曳出方框計算字數（框線若壓在格子上，該格也會被計算）。或用下方按鈕產生區塊擺放版位。頭版自第18行（最左方有一深灰格）開始。</p>
+      <p class="tagline">在左側格線上拖曳出方框計算字數（框線若壓在格子上，該格也會被計算）。或用下方按鈕產生區塊擺放版位。頭版自第18行（最左方有一排深灰格）開始。</p>
 
       <div class="group-title">預設標題字數參考</div>
       <div class="preset-grid" id="presetGrid"></div>
@@ -210,7 +210,8 @@ const COL_BORDER= "#ffffff";
 // 標題深灰框底色：alpha=0.2（即 80% 透明）。想改「不透明度 80%」就把 0.2 改成 0.8
 const TITLE_FILL = "rgba(74,76,82,0.8)";
 // 哪些小格子填深灰：前 6 行（r 0–5）＋ 第 18 行最左邊一格（r=17、第 0 欄第 0 格）
-function isDarkCell(c, i, r){ return r < DARK_ROWS || (r === 17 && c === 0 && i === 0); }
+// 哪些小格子填深灰：前 6 行整行（r 0–5）＋ 第 18–23 行的最左格（r 17–22、第 0 欄第 0 格）
+function isDarkCell(c, i, r){ return r < DARK_ROWS || (c === 0 && i === 0 && r >= 17 && r <= 22); }
 
 function sqX(c,i){ return originX + c*(COL_W+COL_GAP) + i*S; }
 function sqY(r){ return originY + r*(S+ROW_GAP); }

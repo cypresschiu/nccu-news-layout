@@ -35,13 +35,13 @@
   canvas#main{display:block;background:transparent;image-rendering:auto;}
   .hdr-field{
     position:absolute; z-index:20;
-    border:none; border-bottom:1px solid #c9ccd2;
-    background:transparent; outline:none; padding:0 2px; margin:0;
+    border:none; border-radius:4px;
+    background:#e9ebef; outline:none; padding:0 5px; margin:0;
     color:#2a2b2e; font-family:inherit; box-sizing:border-box;
     line-height:normal;
   }
-  .hdr-field:focus{border-bottom-color:var(--accent);}
-  .hdr-field::placeholder{color:#b7bac0;}
+  .hdr-field:focus{background:#e0e3e8;}
+  .hdr-field::placeholder{color:#a7abb2;}
 
   #labelInput{
     position:fixed;
@@ -85,36 +85,37 @@
 
   .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   button{
-    font-family:inherit;cursor:pointer;border:none;border-radius:8px;
-    transition:transform .04s ease, background .15s ease, box-shadow .15s ease;
+    font-family:inherit;cursor:pointer;border:none;border-radius:9px;
+    transition:transform .04s ease, box-shadow .15s ease;
   }
   button:active{transform:translateY(1px);}
+
+  /* 統一的白底＋陰影按鈕（現代簡約） */
   .preset-btn{
-    background:#4a4c52;color:#fff;font-size:12.5px;font-weight:600;
+    background:#fff;color:#4a4c52;font-size:12.5px;font-weight:600;
     padding:9px 4px;line-height:1.3;
+    box-shadow:0 1px 2px rgba(20,22,28,.06), 0 2px 6px rgba(20,22,28,.08);
   }
-  .preset-btn:hover{background:#33353b;}
+  .preset-btn:hover{box-shadow:0 2px 4px rgba(20,22,28,.10), 0 5px 14px rgba(20,22,28,.13);}
   .preset-btn.wide{grid-column:1 / -1;}
+  .preset-btn.c-blue{color:#5a7794;}   /* 下載圖檔：藍字 */
+  .preset-btn.c-red{color:#7d2b3a;}    /* 全部清除：紅字 */
 
-  .action-btn{
-    width:100%;padding:11px;font-size:13px;font-weight:700;
-    background:#eef1f5;color:var(--ink);margin-top:9px;
-    border:1px solid var(--line);
+  /* 頁面工具：縮放（左 2/3）＋ 整頁（右 1/3） */
+  .zoombar{display:flex;align-items:center;gap:8px;margin-top:6px;}
+  .zoomctl{flex:2;display:flex;align-items:center;gap:6px;}
+  .zoomctl button{
+    flex:1;padding:7px;background:#fff;font-size:14px;font-weight:700;color:#4a4c52;
+    box-shadow:0 1px 2px rgba(20,22,28,.06), 0 2px 6px rgba(20,22,28,.08);
   }
-  .action-btn:hover{background:#e4e8ee;}
-  .action-btn.primary{background:#5a7794;color:#fff;border-color:transparent;}
-  .action-btn.primary:hover{background:#4c6883;}
-  .action-btn.danger{background:#7d2b3a;color:#fff;border-color:transparent;}
-  .action-btn.danger:hover{background:#6a2331;}
-
-  .zoombar{display:flex;align-items:center;gap:6px;margin-top:6px;}
-  .zoombar button{
-    flex:1;padding:7px;background:#eef1f5;border:1px solid var(--line);
-    font-size:14px;font-weight:700;color:var(--ink);
-  }
-  .zoombar button:hover{background:#e4e8ee;}
-  .zoom-val{flex:1.4;text-align:center;font-size:12px;color:var(--sub);
+  .zoomctl button:hover{box-shadow:0 2px 4px rgba(20,22,28,.10), 0 5px 14px rgba(20,22,28,.13);}
+  .zoom-val{flex:1.1;text-align:center;font-size:12px;color:var(--sub);
     font-variant-numeric:tabular-nums;}
+  #fitBtn{
+    flex:1;padding:7px;background:#fff;font-size:12.5px;font-weight:700;color:#4a4c52;border-radius:9px;
+    box-shadow:0 1px 2px rgba(20,22,28,.06), 0 2px 6px rgba(20,22,28,.08);
+  }
+  #fitBtn:hover{box-shadow:0 2px 4px rgba(20,22,28,.10), 0 5px 14px rgba(20,22,28,.13);}
 
   .hint{font-size:11px;color:var(--sub);line-height:1.75;margin-top:6px;}
   .hint b{color:var(--ink);font-weight:700;}
@@ -125,8 +126,7 @@
     line-height:1.5;
   }
   .status{
-    font-size:11px;color:var(--sub);margin-top:10px;padding-top:10px;
-    border-top:1px dashed var(--line);line-height:1.7;
+    font-size:11px;color:var(--sub);margin-top:2px;line-height:1.7;
   }
   .status b{color:var(--accent);font-variant-numeric:tabular-nums;}
 </style>
@@ -143,7 +143,8 @@
 
   <aside id="panel">
     <div class="panel-inner">
-      <p class="tagline">在左側格線上拖曳出方框計算字數（框線若壓在格子上，該格也會被計算）。或用下方按鈕產生區塊擺放版位。頭版自第18行（最左方有一排深灰格）開始。</p>
+      <div class="group-title">即時資訊</div>
+      <div class="status" id="statusBox">尚未選取任何方框。</div>
 
       <div class="group-title">預設標題字數參考</div>
       <div class="preset-grid" id="presetGrid"></div>
@@ -156,15 +157,20 @@
 
       <div class="group-title">頁面工具</div>
       <div class="zoombar">
-        <button data-zoom="out" title="縮小">－</button>
-        <span class="zoom-val" id="zoomVal">100%</span>
-        <button data-zoom="in" title="放大">＋</button>
+        <div class="zoomctl">
+          <button data-zoom="out" title="縮小">－</button>
+          <span class="zoom-val" id="zoomVal">100%</span>
+          <button data-zoom="in" title="放大">＋</button>
+        </div>
+        <button id="fitBtn" title="縮到整頁">整頁</button>
       </div>
-      <button class="action-btn" id="fitBtn">縮小到整頁</button>
-      <button class="action-btn primary" id="exportBtn">下載 JPG 圖檔</button>
-      <button class="action-btn danger" id="clearBtn">全部清除</button>
+      <div class="preset-grid" style="margin-top:9px;">
+        <button class="preset-btn c-blue" id="exportBtn" title="下載目前版面為 JPG">下載圖檔</button>
+        <button class="preset-btn c-red" id="clearBtn" title="清除所有框">全部清除</button>
+      </div>
 
       <div class="group-title">操作說明</div>
+      <p class="tagline">在左側格線上拖曳出方框計算字數（框線若壓在格子上，該格也會被計算）。或用下方按鈕產生區塊擺放版位。頭版自第18行（最左方有一排深灰格）開始。</p>
       <div class="hint">
         <b>文字框：</b>在空白處拖曳即可畫出文字框，畫完改大小，並可群組合併計算空格數。雙擊文字框標籤可修改文字。<br>
         <b>圖說／框線：</b>可新增估算字數的圖說框，亦可雙擊標籤修改文字內容，或刪除文字讓它變成單純的矩形框線。<br>
@@ -177,7 +183,6 @@
         <b>縮放：</b><kbd>Ctrl</kbd>＋滾輪，或用「＋／－」「縮到整頁」。<br>
         <b>編輯與日期：</b>右上「編輯／日期」欄位可直接點按輸入文字，若文字太長，介面上可能會顯示不完整，但輸出成圖檔後會全見。<br>
       </div>
-      <div class="status" id="statusBox">尚未選取任何方框。</div>
     </div>
   </aside>
 </div>
@@ -484,9 +489,10 @@ function computeHeaderZones(c){
     const fieldX = fieldsX + labelReserve;
     return {label, value, yc, hf, left, fieldX, fieldRight:rightX, valW:rightX-fieldX};
   };
+  const titleCy = HEADER_H*1;                     // 與左側標題中線對齊
   return {
-    editor: mk('編輯：', header.editor, HEADER_H*0.30),
-    date:   mk('日期：', header.date,   HEADER_H*0.70),
+    editor: mk('編輯：', header.editor, titleCy - hf*0.7),
+    date:   mk('日期：', header.date,   titleCy + hf*0.7),
   };
 }
 
@@ -519,15 +525,12 @@ function drawHeaderFooter(c, forExport){
     c.textAlign='left'; c.textBaseline='middle';
     c.font = `600 ${f.hf}px "Noto Sans TC",sans-serif`; c.fillStyle="#4a4c52";
     c.fillText(f.label, f.left, f.yc);
-    if(forExport){
-      c.strokeStyle="#c9ccd2"; c.lineWidth=1;
-      c.beginPath(); c.moveTo(f.fieldX, f.yc + f.hf*0.7); c.lineTo(f.fieldRight, f.yc + f.hf*0.7); c.stroke();
-      if(f.value){
-        const vs = fitTextC(c, f.value, f.valW-8, f.hf);   // 太長時縮小以塞入欄位
-        c.font = `600 ${vs}px "Noto Sans TC",sans-serif`;
-        c.fillStyle="#2a2b2e"; c.textAlign='left'; c.textBaseline='middle';
-        c.fillText(f.value, f.fieldX+4, f.yc);
-      }
+    if(forExport && f.value){
+      // 匯出時只畫文字，不畫底色/底線
+      const vs = fitTextC(c, f.value, f.valW-8, f.hf);   // 太長時縮小以塞入欄位
+      c.font = `600 ${vs}px "Noto Sans TC",sans-serif`;
+      c.fillStyle="#2a2b2e"; c.textAlign='left'; c.textBaseline='middle';
+      c.fillText(f.value, f.fieldX+4, f.yc);
     }
   }
   // 底部署名（僅畫面上顯示，匯出 JPG 時不出現）
@@ -535,7 +538,7 @@ function drawHeaderFooter(c, forExport){
     c.textAlign='center'; c.textBaseline='middle';
     c.font = `500 ${Math.min(FOOTER_H*0.42,14)}px "Noto Sans TC",sans-serif`;
     c.fillStyle="#9a9da3";
-    c.fillText('Designed by Roderick Chiu｜Built via vibe coding with Claude', worldW/2, worldH - FOOTER_H*1);
+    c.fillText('Designed by Roderick Chiu｜Built via vibe coding with Claude', worldW/2, (originY + gridH + worldH)/2);
   }
 }
 

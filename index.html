@@ -874,13 +874,13 @@ function clearAll(){
 /* =========================================================
    預設標題新增（畫面正中央）
    ========================================================= */
-// 產生的圖形對齊「最右上角小格子的右上角」：
-// 右邊界靠齊 originX+gridW（格線右緣）、頂端靠齊 originY（格線上緣）
-function spawnXY(w){ return { x: originX + gridW - w, y: originY }; }
+// 產生的圖形右邊界靠齊格線右緣（originX+gridW）；頂端對齊第 (row+1) 行的上緣
+// row=0 → 最上一行（最右上角）；row=6 → 第 7 行
+function spawnXY(w, row=0){ return { x: originX + gridW - w, y: sqY(row) }; }
 function addPreset(p){
   pushHistory();
   const {w,h}=presetSize(p);
-  const {x,y}=spawnXY(w);
+  const {x,y}=spawnXY(w, p.key==='頭條單行' ? 0 : 6);   // 只有頭條單行貼最右上角，其餘對齊第 7 行
   const R={id:idc++, kind:'preset', name:p.name,
            x, y, w, h, groupId:null, resizable:!!p.resizable};
   rects.push(R); setSelection([R.id]); render();
@@ -889,7 +889,7 @@ function addImageBox(){
   pushHistory();
   const h = 23*S + 22*ROW_GAP;         // 高 23 行（含 22 行間距）
   const w = 3*COL_W + 2*COL_GAP;       // 寬 3 欄（含 2 欄間距）
-  const {x,y}=spawnXY(w);
+  const {x,y}=spawnXY(w, 6);           // 對齊第 7 行最右格右上角
   const R={id:idc++, kind:'image', x, y, w, h, groupId:null, resizable:true};
   rects.push(R); setSelection([R.id]); render();
 }
@@ -904,7 +904,7 @@ function addCaptionBox(){
   pushHistory();
   const h = 4*S + 3*ROW_GAP;           // 預設高 4 行（可自行拉大小）
   const w = 2*COL_W + COL_GAP;         // 預設寬 2 欄
-  const {x,y}=spawnXY(w);
+  const {x,y}=spawnXY(w, 6);           // 對齊第 7 行最右格右上角
   const R={id:idc++, kind:'caption', x, y, w, h, groupId:null, resizable:true};
   rects.push(R); sinkCaptions(); setSelection([R.id]); render();
 }

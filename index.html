@@ -31,7 +31,7 @@
     overflow:auto;
     background:var(--bg);
   }
-  #canvasWrap{position:relative;width:max-content;}
+  #canvasWrap{position:relative;width:max-content;margin:0 auto;}
   canvas#main{display:block;background:transparent;image-rendering:auto;}
   .hdr-field{
     position:absolute; z-index:20;
@@ -1067,28 +1067,30 @@ window.addEventListener('keydown', e=>{
 stage.addEventListener('wheel', e=>{
   if(!(e.ctrlKey||e.metaKey)) return;   // 一般滾輪 -> 捲動
   e.preventDefault();
-  const sr = stage.getBoundingClientRect();
-  const mx = e.clientX - sr.left + stage.scrollLeft;  // 內容座標
-  const my = e.clientY - sr.top  + stage.scrollTop;
-  const wx = mx/scale, wy = my/scale;
+  const c0 = canvas.getBoundingClientRect();
+  const wx = (e.clientX - c0.left)/scale;   // 游標對應的世界座標
+  const wy = (e.clientY - c0.top )/scale;
   const old=scale;
   const factor = e.deltaY<0 ? 1.1 : 1/1.1;
   scale = Math.max(minScale, Math.min(maxScale, scale*factor));
   if(scale===old) return;
   applyScale();
-  stage.scrollLeft = wx*scale - (e.clientX - sr.left);
-  stage.scrollTop  = wy*scale - (e.clientY - sr.top);
+  const c1 = canvas.getBoundingClientRect();
+  stage.scrollLeft += (c1.left + wx*scale) - e.clientX;   // 讓同一世界點維持在游標處
+  stage.scrollTop  += (c1.top  + wy*scale) - e.clientY;
 }, {passive:false});
 
 document.querySelectorAll('[data-zoom]').forEach(b=>{
   b.onclick=()=>{
     const sr=stage.getBoundingClientRect();
-    const cx=sr.width/2+stage.scrollLeft, cy=sr.height/2+stage.scrollTop;
-    const wx=cx/scale, wy=cy/scale;
-    scale = b.dataset.zoom==='in'? scale*1.15 : scale/1.15;
+    const ax=sr.left+sr.width/2, ay=sr.top+sr.height/2;   // 以工作區中心為錨點
+    const c0=canvas.getBoundingClientRect();
+    const wx=(ax-c0.left)/scale, wy=(ay-c0.top)/scale;
+    scale = b.dataset.zoom==='in'? Math.min(maxScale, scale*1.15) : Math.max(minScale, scale/1.15);
     applyScale();
-    stage.scrollLeft=wx*scale-sr.width/2;
-    stage.scrollTop =wy*scale-sr.height/2;
+    const c1=canvas.getBoundingClientRect();
+    stage.scrollLeft += (c1.left + wx*scale) - ax;
+    stage.scrollTop  += (c1.top  + wy*scale) - ay;
   };
 });
 document.getElementById('fitBtn').onclick=()=>{ scale=fitPageScale()*0.98; applyScale(); stage.scrollTop=0; stage.scrollLeft=0; };
